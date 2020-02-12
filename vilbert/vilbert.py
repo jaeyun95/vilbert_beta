@@ -1253,7 +1253,7 @@ class BertPreTrainedModel(nn.Module):
             )
         return model
 
-
+### this is for bert embedding
 class BertModel(BertPreTrainedModel):
     """BERT model ("Bidirectional Embedding Representations from a Transformer").
 
@@ -1387,7 +1387,8 @@ class BertModel(BertPreTrainedModel):
 
         pooled_output_t = self.t_pooler(sequence_output_t)
         pooled_output_v = self.v_pooler(sequence_output_v)
-
+        #print('$$$$$$$$$$$$$$$$$$$$$$4 text ',pooled_output_t.shape)
+        #print('$$$$$$$$$$$$$$$$$$$$$$4 vision ', pooled_output_v.shape)
         if not output_all_encoded_layers:
             encoded_layers_t = encoded_layers_t[-1]
             encoded_layers_v = encoded_layers_v[-1]
@@ -1527,7 +1528,16 @@ class VILBertForVLTasks(BertPreTrainedModel):
         image_attention_mask=None,
         co_attention_mask=None,
         output_all_encoded_layers=False,
+        question_len = int,
+        answer0_len = int,
+        answer1_len = int,
+        answer2_len = int,
+        answer3_len = int
     ):
+
+        #print('######### input t ',input_txt[,:question_len])
+        #print('@@@@@@@@@@ input i ',co_attention_mask)
+        #check pooled and sequence
         sequence_output_t, sequence_output_v, pooled_output_t, pooled_output_v, _ = self.bert(
             input_txt,
             input_imgs,
@@ -1546,7 +1556,7 @@ class VILBertForVLTasks(BertPreTrainedModel):
         vision_logit = 0
         linguisic_prediction = 0
         linguisic_logit = 0
-        
+
         linguisic_prediction, vision_prediction, vil_binary_prediction = self.cls(
             sequence_output_t, sequence_output_v, pooled_output_t, pooled_output_v
         )
@@ -1557,13 +1567,14 @@ class VILBertForVLTasks(BertPreTrainedModel):
             pooled_output = self.dropout(pooled_output_t * pooled_output_v)
         else:
             assert False
-        
+
         vil_prediction = self.vil_prediction(pooled_output)
         vil_logit = self.vil_logit(pooled_output)
         vision_logit = self.vision_logit(self.dropout(sequence_output_v)) + ((1.0 - image_attention_mask)* -10000.0).unsqueeze(2).to(dtype=next(self.parameters()).dtype)
         linguisic_logit = self.linguisic_logit(self.dropout(sequence_output_t))
 
-        return vil_prediction, vil_logit, vil_binary_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit
+
+        return vil_prediction, vil_logit, vil_binary_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, sequence_output_t, sequence_output_v
 
 class SimpleClassifier(nn.Module):
     def __init__(self, in_dim, hid_dim, out_dim, dropout):

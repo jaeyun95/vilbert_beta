@@ -5,7 +5,7 @@ import os
 import random
 from io import open
 import numpy as np
-
+import h5py
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from bisect import bisect
@@ -96,7 +96,7 @@ def main():
         help="save name for training.", 
     )
     parser.add_argument(
-        "--batch_size", default=1000, type=int, help="what is the batch size?"
+        "--batch_size", default=50, type=int, help="what is the batch size?"
     )
     parser.add_argument(
         "--tasks", default='', type=str, help="1-2-3... training task separate by -"
@@ -114,7 +114,7 @@ def main():
     args = parser.parse_args()
     with open('vlbert_tasks.yml', 'r') as f:
         task_cfg = edict(yaml.safe_load(f))
-
+    #print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ args ',args)
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -178,9 +178,7 @@ def main():
             )
     else:
         model = VILBertForVLTasks.from_pretrained(
-            args.from_pretrained, config, num_labels=num_labels, default_gpu=default_gpu
-            )
-
+            args.from_pretrained, config, num_labels=num_labels, default_gpu=default_gpu)
     task_losses = LoadLosses(args, task_cfg, args.tasks.split('-'))
     model.to(device)
     if args.local_rank != -1:
@@ -201,15 +199,30 @@ def main():
     print("  Batch size: ", task_batch_size)    
 
     model.eval()
+    output_h5_qa = h5py.File(f'/media/ailab/jaeyun/ViLBERT/VCR/embedding/train_question_rationale.h5', 'w')
+    output_h5_feature = h5py.File(f'/media/ailab/jaeyun/ViLBERT/VCR/embedding/train_image_rationale_feature.h5', 'w')
+    index = 0
     for task_id in task_ids:
         results = []
         others = []
         for i, batch in enumerate(task_dataloader_val[task_id]):
-            loss, score, batch_size, results, others = EvaluatingModel(args, task_cfg, device, \
+            #print('@@@ batch' ,batch)
+            loss, score, batch_size, results, others, result_question, result_feature = EvaluatingModel(args, task_cfg, device, \
                     task_id, batch, model, task_dataloader_val, task_losses, results, others)
+            for k,rg in enumerate(result_question):
+                output_h5_qa.create_group(f'{index}')
+                output_h5_qa[f'{index}'].create_dataset(f'anno_id', data=rg["question_id"])
+                output_h5_feature.create_group(f'{index}')
+                output_h5_feature[f'{index}'].create_dataset(f'anno_id', data=rg["question_id"])
+
+                for t,q in enumerate(rg['feature']):
+                    output_h5_qa[f'{index}'].create_dataset(f'feature'+str(t), data=q.cpu().numpy())
+                for t,f in enumerate(result_feature[k]['feature']):
+                    output_h5_feature[f'{index}'].create_dataset(f'feature'+str(t), data=f.cpu().numpy())
+                index += 1
+
 
             tbLogger.step_val(0, float(loss), float(score), task_id, batch_size, 'val')
-
             sys.stdout.write('%d/%d\r' % (i, len(task_dataloader_val[task_id])))
             sys.stdout.flush()
         # save the result or evaluate the result.

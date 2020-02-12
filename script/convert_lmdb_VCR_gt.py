@@ -29,7 +29,7 @@ def converId(img_id):
 image_path = {}
 path2id = {}
 metadata_path = {}
-with open('train.jsonl', 'rb') as f: # opening file in binary(rb) mode    
+with open('train_scene_version.jsonl', 'rb') as f: # opening file in binary(rb) mode
     for item in json_lines.reader(f):
         if item['img_fn'] not in image_path:
             image_path[item['img_fn']] = 1
@@ -37,7 +37,7 @@ with open('train.jsonl', 'rb') as f: # opening file in binary(rb) mode
             metadata_path[item['metadata_fn']] = 1
             path2id[item['img_fn']] = converId(item['img_id'])
 
-with open('val.jsonl', 'rb') as f: # opening file in binary(rb) mode    
+with open('val_scene_version.jsonl', 'rb') as f: # opening file in binary(rb) mode
     for item in json_lines.reader(f):
         if item['img_fn'] not in image_path:
             image_path[item['img_fn']] = 1

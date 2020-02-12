@@ -166,10 +166,11 @@ def main():
         from vilbert.basebert import BaseBertForVLTasks
     elif args.compact:
         from vilbert.vilbert_compact import BertConfig
-        from vilbert.vilbert_compact import VILBertForVLTasks        
+        from vilbert.vilbert_compact import VILBertForVLTasks
     else:
         from vilbert.vilbert import BertConfig
         from vilbert.vilbert import VILBertForVLTasks
+
 
     task_names = []
     task_lr = []
@@ -261,6 +262,7 @@ def main():
 
     task_losses = LoadLosses(args, task_cfg, args.tasks.split('-'))
     model.to(device)
+    #model.to(device)
     if args.local_rank != -1:
         try:
             from apex.parallel import DistributedDataParallel as DDP
@@ -372,6 +374,7 @@ def main():
     startIterID = 0
     # initialize the data iteration.
     task_iter_train = {name:None for name in task_ids}
+
     task_count = {name:0 for name in task_ids}
     for epochId in tqdm(range(args.num_train_epochs), desc="Epoch"):
         model.train()

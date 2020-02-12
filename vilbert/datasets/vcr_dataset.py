@@ -47,7 +47,10 @@ def _load_annotationsQ_A(annotations_jsonpath, split):
             else:
                 ans_label = annotation["answer_label"]
             img_id = _converId(annotation["img_id"])
+            #print('annotation["annot_id"] : ', annotation["annot_id"])
             anno_id = int(annotation["annot_id"].split('-')[1])
+            #print('after annotation["annot_id"] : ', anno_id)
+            #print('@@@@@@@@@@@@ ', anno_id)
             entries.append(
                 {"question": question, 'answers':annotation["answer_choices"], "metadata_fn": annotation["metadata_fn"], 'target':ans_label, 'img_id':img_id, 'anno_id':anno_id}
             )
@@ -67,7 +70,10 @@ def _load_annotationsQA_R(annotations_jsonpath, split):
                     question = annotation["question"] + ["[SEP]"] + answer   
                     img_id = _converId(annotation["img_id"])
                     ans_label = 0
+                    #print('annotation["annot_id"] : ', annotation["annot_id"])
                     anno_id = int(annotation["annot_id"].split('-')[1])
+                    #print('after annotation["annot_id"] : ', anno_id)
+                    #print('@@@@@@@@@@@@ ', anno_id)
                     entries.append(
                         {"question": question, 'answers':annotation["rationale_choices"], "metadata_fn": annotation["metadata_fn"], 'target':ans_label, 'img_id':img_id}
                     )
@@ -77,7 +83,11 @@ def _load_annotationsQA_R(annotations_jsonpath, split):
                 ans_label = annotation["rationale_label"]
                 # img_fn = annotation["img_fn"]
                 img_id = _converId(annotation["img_id"])
+                #print('annotation["annot_id"] : ',annotation["annot_id"])
                 anno_id = int(annotation["annot_id"].split('-')[1])
+                #print('after annotation["annot_id"] : ', anno_id)
+                #anno_id = annotation["annot_id"]
+                #print('@@@@@@@@@@@@ ',anno_id)
                 entries.append(
                     {"question": question, 'answers':annotation["rationale_choices"], "metadata_fn": annotation["metadata_fn"], 'target':ans_label, 'img_id':img_id, 'anno_id':anno_id}
                 )
@@ -126,7 +136,7 @@ class VCRDataset(Dataset):
             os.makedirs(os.path.join(dataroot, "cache"))
 
         # cache file path data/cache/train_ques
-        cache_path = "data/VCR/cache/" + split + '_' + task + "_" + str(max_seq_length) + "_" + str(max_region_num) + "_vcr.pkl"
+        cache_path = "/media/ailab/jaeyun/ViLBERT/VCR/cache/" + split + '_' + task + "_" + str(max_seq_length) + "_" + str(max_region_num) + "_vcr.pkl"
         if not os.path.exists(cache_path):
             self.tokenize()
             self.tensorize()
@@ -142,7 +152,7 @@ class VCRDataset(Dataset):
         """
         count = 0
         for entry in self._entries:
-            metadata_fn = json.load(open(os.path.join('data/VCR/vcr1images', entry["metadata_fn"]), 'r'))
+            metadata_fn = json.load(open(os.path.join('/media/ailab/songyoungtak/vcr1/vcr1images', entry["metadata_fn"]), 'r'))
             det_names = metadata_fn["names"]
             random_names = self.generate_random_name(det_names)
             # replace with name
@@ -152,10 +162,11 @@ class VCRDataset(Dataset):
             co_attention_mask_all = []
             input_mask_all = []
             segment_ids_all = []
-
+            entry['question_len'] = len(tokens_a)
+            answer_len = []
             for answer in entry["answers"]:
                 tokens_b, mask_b = self.replace_det_with_name(answer, random_names)
-
+                answer_len.append(len(tokens_b))
                 self._truncate_seq_pair(tokens_a, tokens_b, mask_a, mask_b, self._max_caption_length - 3)
 
                 tokens = []
@@ -181,6 +192,8 @@ class VCRDataset(Dataset):
                 co_attention_mask = [-1] + mask_a + [-1] + mask_b + [-1]
 
                 input_mask = [1] * len(input_ids)
+                #print('@@@@@@@@@@@@@@@@ input mask! ',input_ids)
+                #entry["origin_length"] = len(input_ids)
                 # Zero-pad up to the sequence length.
                 while len(input_ids) < self._max_caption_length:
                     input_ids.append(0)
@@ -196,7 +209,7 @@ class VCRDataset(Dataset):
                 input_ids_all.append(input_ids)
                 input_mask_all.append(input_mask)
                 segment_ids_all.append(segment_ids)
-            
+            entry["answer_len"] = answer_len
             entry["co_attention_mask"] = co_attention_mask_all
             entry["input_ids"] = input_ids_all
             entry["input_mask"] = input_mask_all
@@ -269,7 +282,10 @@ class VCRDataset(Dataset):
     def __getitem__(self, index):
         
         entry = self._entries[index]
-
+        #print('question len : ',entry['question_len'])
+        #print('answer len : ',entry['answer_len'])
+        #print('#################### entry',entry)
+        #print('entry!!', entry["origin_length"])
         image_id = entry["img_id"]
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -320,12 +336,19 @@ class VCRDataset(Dataset):
         segment_ids = entry["segment_ids"]
         target = int(entry["target"])
 
+        #print('in : ',input_ids)
+        #lens = 0
+        #for i in range(input_ids):
+        #    if i == 0: break
+        #    lens += 1
+        #print('qqqq : ',lens)
         if self._split == 'test':
             # anno_id = entry["anno_id"]
             anno_id = 0#entry["anno_id"]
         else:
-            anno_id = entry["img_id"]
-
+            #anno_id = entry["img_id"]
+            anno_id = entry["anno_id"]
+        #print('annot_id : ',anno_id)
         co_attention_idxs = entry["co_attention_mask"]
         co_attention_mask = torch.zeros((len(entry["co_attention_mask"]), self._max_region_num, self._max_caption_length))
 
@@ -334,7 +357,7 @@ class VCRDataset(Dataset):
                 if idx != -1 and idx+num_box_preserve < self._max_region_num:
                     co_attention_mask[ii, idx+num_box_preserve, jj] = 1
 
-        return features, spatials, image_mask, input_ids, target, input_mask, segment_ids, co_attention_mask, anno_id
-
+        #return features, spatials, image_mask, input_ids, target, input_mask, segment_ids, co_attention_mask, anno_id, entry['question'], entry['anno_id'], entry['answers']
+        return features, spatials, image_mask, input_ids, target, input_mask, segment_ids, co_attention_mask, anno_id, entry['question_len'], entry['answer_len'][0], entry['answer_len'][1], entry['answer_len'][2], entry['answer_len'][3]
     def __len__(self):
         return len(self._entries)

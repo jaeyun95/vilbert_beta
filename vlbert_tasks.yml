@@ -21,35 +21,35 @@ TASK1:
   type: VL-logit
   loss: CrossEntropyLoss
   task_id: 6
-  dataroot: data/VCR
-  features_h5path1: data/VCR/VCR_resnet101_faster_rcnn_genome.lmdb
-  features_h5path2: data/VCR/VCR_gt_resnet101_faster_rcnn_genome.lmdb
-  train_annotations_jsonpath: data/VCR/train.jsonl
-  val_annotations_jsonpath: data/VCR/val.jsonl
+  dataroot: /media/ailab/jaeyun/ViLBERT/VCR
+  features_h5path1: /media/ailab/jaeyun/ViLBERT/VCR/VCR_resnet101_faster_rcnn_genome.lmdb
+  features_h5path2: /media/ailab/jaeyun/ViLBERT/VCR/VCR_gt_resnet101_faster_rcnn_genome.lmdb
+  train_annotations_jsonpath: /media/ailab/jaeyun/ViLBERT/VCR/train_scene_version.jsonl
+  val_annotations_jsonpath: /media/ailab/jaeyun/ViLBERT/VCR/train_scene_version.jsonl
   max_seq_length: 60
   max_region_num: 100
   batch_size: 64
   train_split: train
   val_split: val
   lr: 0.00002
-  num_epoch: 20
+  num_epoch: 1
 TASK2:
   name: VCR_QA-R
   type: VL-logit
   loss: CrossEntropyLoss
   task_id: 7
-  dataroot: data/VCR
-  features_h5path1: data/VCR/VCR_resnet101_faster_rcnn_genome.lmdb
-  features_h5path2: data/VCR/VCR_gt_resnet101_faster_rcnn_genome.lmdb
-  train_annotations_jsonpath: data/VCR/train.jsonl
-  val_annotations_jsonpath: data/VCR/val.jsonl
+  dataroot: /media/ailab/jaeyun/ViLBERT/VCR
+  features_h5path1: /media/ailab/jaeyun/ViLBERT/VCR/VCR_resnet101_faster_rcnn_genome.lmdb
+  features_h5path2: /media/ailab/jaeyun/ViLBERT/VCR/VCR_gt_resnet101_faster_rcnn_genome.lmdb
+  train_annotations_jsonpath: /media/ailab/jaeyun/ViLBERT/VCR/train_scene_version.jsonl
+  val_annotations_jsonpath: /media/ailab/jaeyun/ViLBERT/VCR/train_scene_version.jsonl
   max_seq_length: 80
   max_region_num: 100
   batch_size: 64
   train_split: train
   val_split: val
   lr: 0.00002
-  num_epoch: 20
+  num_epoch: 1
 TASK3:
   name: RetrievalFlickr30k
   type: VL-logit

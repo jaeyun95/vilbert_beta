@@ -112,6 +112,8 @@ def ForwardModelsTrain(args, task_cfg, device, task_id, task_count, task_iter_tr
     vil_prediction, vil_logit, vil_binary_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit = \
             model(question, features, spatials, segment_ids, input_mask, image_mask, co_attention_mask)
 
+    #print('vil_ prediction : ',vil_prediction)
+    #print('vil_logit : ',vil_logit)
     # for different task, we use different output to calculate the loss.
     if task_cfg[task_id]['type'] == 'VL-classifier':
         loss = task_losses[task_id](vil_prediction, target)
@@ -338,16 +340,25 @@ def compute_score_with_logits(logits, labels):
 
 def EvaluatingModel(args, task_cfg, device, task_id, batch, model, task_dataloader, task_losses, results, others):
     batch = tuple(t.cuda(device=device, non_blocking=True) for t in batch)
-    features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = batch
+    features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id, question_len,\
+        answer0_len, answer1_len, answer2_len, answer3_len= batch
     batch_size = features.size(0)
-
+    result_feature = []
+    result_question = []
     if task_id in ['TASK0', 'TASK1', 'TASK2']:
         max_num_bbox = features.size(1)
         num_options = question.size(1)
+        #print('batch_size : ',batch_size)
+        #print('num_options : ',num_options)
+        #print('max_num_bbox : ',max_num_bbox)
+        #print('before features : ',features.shape)
         features = features.unsqueeze(1).expand(batch_size, num_options, max_num_bbox, 2048).contiguous().view(-1, max_num_bbox, 2048)
+        #print('after features : ', features.shape)
         spatials = spatials.unsqueeze(1).expand(batch_size, num_options, max_num_bbox, 5).contiguous().view(-1, max_num_bbox, 5)
         image_mask = image_mask.unsqueeze(1).expand(batch_size, num_options, max_num_bbox).contiguous().view(-1, max_num_bbox)
+        #print('before features : ', question.shape)
         question = question.view(-1, question.size(2))
+        #print('after features : ', question.shape)
         input_mask = input_mask.view(-1, input_mask.size(2))
         segment_ids = segment_ids.view(-1, segment_ids.size(2))
         co_attention_mask = co_attention_mask.view(-1, co_attention_mask.size(2), co_attention_mask.size(3))
@@ -365,9 +376,11 @@ def EvaluatingModel(args, task_cfg, device, task_id, batch, model, task_dataload
         co_attention_mask = co_attention_mask.view(-1, co_attention_mask.size(2), co_attention_mask.size(3))
 
     with torch.no_grad():
-        vil_prediction, vil_logit, vil_binary_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit \
-            = model(question, features, spatials, segment_ids, input_mask, image_mask, co_attention_mask)
-
+        vil_prediction, vil_logit, vil_binary_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit ,\
+        sequence_output_t, sequence_output_v = model(question, features, spatials, segment_ids, input_mask, image_mask, co_attention_mask, question_len,\
+        answer0_len, answer1_len, answer2_len, answer3_len)
+    #print('vision_logit : ',vision_logit.shape)
+    #print('linguisic_logit : ', linguisic_logit.shape)
     if task_cfg[task_id]['type'] == 'VL-classifier':
         logits = torch.max(vil_prediction, 1)[1].data  # argmax
         sorted_score, sorted_idx = torch.sort(-vil_prediction) 
@@ -382,16 +395,31 @@ def EvaluatingModel(args, task_cfg, device, task_id, batch, model, task_dataload
             # save top 8 as options.
             others.append({'question_id':question_id[i].item(), \
                 'answer':[task_dataloader[task_id].dataset.label2ans[idx.item()] for idx in topkInd[i]]})
- 
+
+    ## VCR task is here!!!!@@@@@@@@@@@@@@@@@@@@@@
     elif task_cfg[task_id]['type'] == 'VL-logit':
+        #print('bbbefore : ', vil_logit.shape)
         vil_logit = vil_logit.view(batch_size, num_options)
         loss = task_losses[task_id](vil_logit, target)
         _, preds = torch.max(vil_logit, 1)
         batch_score = (preds == target).sum()
-        
+        ## here
+        #print('before ',sequence_output_t)
+
+        sequence_output_t = sequence_output_t.view(batch_size, num_options, 80, 768)
+        #print('after ', sequence_output_t)
+        #print('dddd : ',sequence_output_t.shape)
+        sequence_output_v = sequence_output_v.view(batch_size, num_options, 100, 1024)
+        #print('dsadasd : ',sequence_output_v.shape)
+        #print('aaaa',vil_logit.size(0))
         probs = torch.softmax(vil_logit, dim=1)
+
         for i in range(vil_logit.size(0)):
             results.append({'question_id':question_id[i].item(), 'answer':[prob.item() for prob in probs[i]]})
+            result_question.append({'question_id': question_id[i].item(), 'feature':[ans for ans in sequence_output_t[i]]})
+            result_feature.append({'question_id': question_id[i].item(), 'feature':[ans for ans in sequence_output_v[i]]})
+        #for i in range(batch_size):
+        #    result_feature.append(({'question_id':question_id[i].item(), 'question':, 'answers':[for ans in sequence_output_v[i]]}))
 
     elif task_cfg[task_id]['type'] == 'V-logit':
         loss = task_losses[task_id](vision_logit, target)
@@ -403,4 +431,4 @@ def EvaluatingModel(args, task_cfg, device, task_id, batch, model, task_dataload
         for i in range(select_idx.size(0)):
             results.append({'id':question_id[i].item(), 'target':select_idx[i].item(), 'IOU': select_target[i].item()})
 
-    return float(loss), float(batch_score), batch_size, results, others
+    return float(loss), float(batch_score), batch_size, results, others, result_question, result_feature
